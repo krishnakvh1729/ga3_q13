@@ -3,7 +3,7 @@ name: Scrape Table Sums
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # This lets you run it manually too
+  workflow_dispatch:
 
 jobs:
   scrape:
@@ -22,7 +22,42 @@ jobs:
         run: |
           npm init -y
           npm install playwright
-          npx playwright install chromium --with-deps
+          npx playwright install --with-deps chromium
 
       - name: Run Playwright scraper
-        run: node scrape.js
+        run: |
+          cat << 'EOF' > scrape.js
+          const { chromium } = require('playwright');
+          const urls = [
+            'https://sanand0.github.io/tdsdata/js_table/?seed=35',
+            'https://sanand0.github.io/tdsdata/js_table/?seed=36',
+            'https://sanand0.github.io/tdsdata/js_table/?seed=37',
+            'https://sanand0.github.io/tdsdata/js_table/?seed=38',
+            'https://sanand0.github.io/tdsdata/js_table/?seed=39',
+            'https://sanand0.github.io/tdsdata/js_table/?seed=40',
+            'https://sanand0.github.io/tdsdata/js_table/?seed=41',
+            'https://sanand0.github.io/tdsdata/js_table/?seed=42',
+            'https://sanand0.github.io/tdsdata/js_table/?seed=43',
+            'https://sanand0.github.io/tdsdata/js_table/?seed=44',
+          ];
+          async function scrapeAll() {
+            const browser = await chromium.launch();
+            const page = await browser.newPage();
+            let grandTotal = 0;
+            for (const url of urls) {
+              console.log('Visiting: ' + url);
+              await page.goto(url);
+              await page.waitForSelector('table');
+              const numbers = await page.$$eval('td', cells =>
+                cells.map(c => parseFloat(c.innerText.trim())).filter(n => !isNaN(n))
+              );
+              const pageSum = numbers.reduce((a, b) => a + b, 0);
+              console.log('Sum for this page: ' + pageSum);
+              grandTotal += pageSum;
+            }
+            await browser.close();
+            console.log('Total sum across all pages: ' + grandTotal);
+          }
+          scrapeAll().catch(err => { console.error(err); process.exit(1); });
+          EOF
+          node scrape.js
